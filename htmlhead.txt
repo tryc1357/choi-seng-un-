@@ -3,3 +3,188 @@
 </head><body>테스트페이지</body>
 
 </html>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>투명 서명 생성기</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        #signature-canvas {
+            border: 2px solid #333;
+            /* 배경색을 흰색으로 지정하면 서명 그리는 동안 투명하게 보이지만, */
+            /* 실제 PNG 저장 시에는 JavaScript에서 설정한 투명 배경이 적용됩니다. */
+            background-color: white; 
+            cursor: crosshair;
+            touch-action: none; /* 모바일에서 스크롤 방지 */
+        }
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 10px 15px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        #download-btn {
+            background-color: #007bff;
+            color: white;
+        }
+        #download-btn:hover {
+            background-color: #0056b3;
+        }
+        #clear-btn {
+            background-color: #dc3545;
+            color: white;
+        }
+        #clear-btn:hover {
+            background-color: #c82333;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>📝 투명 배경 서명 생성기</h1>
+    <p>아래 영역에 서명을 해주세요.</p>
+    
+    
+    <canvas id="signature-canvas" width="400" height="200"></canvas>
+    
+    <div class="controls">
+        <button id="clear-btn">지우기</button>
+        <button id="download-btn">투명 PNG로 다운로드</button>
+    </div>
+
+    <script>
+        // DOM 요소 가져오기
+        const canvas = document.getElementById('signature-canvas');
+        const ctx = canvas.getContext('2d');
+        const clearButton = document.getElementById('clear-btn');
+        const downloadButton = document.getElementById('download-btn');
+
+        // 서명 관련 상태 변수
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+
+        // **Canvas 초기 설정**
+        // 기본 캔버스 배경을 **투명(Transparent)**하게 설정합니다.
+        // PNG는 알파 채널(투명도)을 지원하므로, 이 설정이 최종 다운로드 파일에 영향을 줍니다.
+        function setupCanvas() {
+            // 서명 그리기 전에 캔버스 전체를 투명한 색으로 채웁니다.
+            // PNG로 저장 시 이 투명도가 유지됩니다.
+            ctx.fillStyle = 'rgba(0, 0, 0, 0)'; 
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 선 스타일 설정
+            ctx.strokeStyle = '#000000'; // 서명 색상 (검정)
+            ctx.lineWidth = 3;             // 선 굵기
+            ctx.lineCap = 'round';         // 선 끝 모양 둥글게
+            ctx.lineJoin = 'round';        // 선 연결 부분 둥글게
+        }
+
+        // 마우스 및 터치 이벤트 처리 함수
+        function draw(e) {
+            if (!isDrawing) return;
+
+            // 좌표 계산 (마우스 또는 터치)
+            const clientX = e.clientX || e.touches[0].clientX;
+            const clientY = e.clientY || e.touches[0].clientY;
+
+            // 캔버스 내에서의 상대 좌표 계산
+            const rect = canvas.getBoundingClientRect();
+            const x = clientX - rect.left;
+            const y = clientY - rect.top;
+
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY); // 이전 위치에서 시작
+            ctx.lineTo(x, y);         // 현재 위치까지 선 그리기
+            ctx.stroke();
+
+            // 현재 위치를 다음 선의 시작점으로 업데이트
+            [lastX, lastY] = [x, y];
+        }
+
+        function startDrawing(e) {
+            isDrawing = true;
+            
+            const clientX = e.clientX || e.touches[0].clientX;
+            const clientY = e.clientY || e.touches[0].clientY;
+            
+            const rect = canvas.getBoundingClientRect();
+            // 시작 위치를 현재 위치로 설정
+            [lastX, lastY] = [clientX - rect.left, clientY - rect.top];
+
+            // 클릭/터치 시 작은 점이 찍히도록 보정
+            ctx.beginPath();
+            ctx.arc(lastX, lastY, ctx.lineWidth / 2, 0, Math.PI * 2, false);
+            ctx.fillStyle = ctx.strokeStyle;
+            ctx.fill();
+        }
+
+        function stopDrawing() {
+            isDrawing = false;
+        }
+
+        // 지우기 버튼 핸들러
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // 캔버스 전체 지우기
+            setupCanvas(); // 투명 배경 초기화
+        }
+
+        // 다운로드 버튼 핸들러
+        function downloadSignature() {
+            // **핵심: Canvas 내용을 PNG(기본 투명 배경 지원)로 변환**
+            // dataURL은 'data:image/png;base64,iVBORw...' 형식의 문자열입니다.
+            const dataURL = canvas.toDataURL('image/png'); 
+            
+            // 다운로드를 위한 임시 <a> 태그 생성
+            const a = document.createElement('a');
+            a.href = dataURL;
+            a.download = 'signature_transparent.png'; // 다운로드 파일 이름
+            
+            // 다운로드 실행
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        // 이벤트 리스너 등록
+        
+        // 마우스 이벤트
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        document.addEventListener('mouseup', stopDrawing);
+
+        // 터치 이벤트 (모바일)
+        canvas.addEventListener('touchstart', (e) => startDrawing(e));
+        canvas.addEventListener('touchmove', (e) => {
+            // 터치 이벤트를 처리하는 동안 브라우저 기본 동작(스크롤 등)을 막습니다.
+            e.preventDefault(); 
+            draw(e);
+        }, { passive: false }); // passive: false를 사용해 preventDefault()가 작동하게 함
+        document.addEventListener('touchend', stopDrawing);
+
+
+        clearButton.addEventListener('click', clearCanvas);
+        downloadButton.addEventListener('click', downloadSignature);
+
+        // 페이지 로드 시 캔버스 초기화
+        setupCanvas();
+
+    </script>
+</body>
+</html>
